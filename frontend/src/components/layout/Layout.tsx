@@ -1,8 +1,9 @@
 import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FiHome, FiCompass, FiUser, FiLogOut, FiSearch } from 'react-icons/fi';
+import { FiHome, FiCompass, FiUser, FiLogOut, FiSearch, FiBell } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
 import Avatar from '../ui/Avatar';
+import NotificationBell from './NotificationBell';
 
 interface LayoutProps {
   children: ReactNode;
@@ -32,10 +33,11 @@ export default function Layout({ children }: LayoutProps) {
       <div className="max-w-7xl mx-auto flex">
         {/* Sidebar */}
         <aside className="w-64 h-screen sticky top-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hidden md:block">
-          <div className="p-4">
+          <div className="p-4 flex items-center justify-between">
             <Link to="/" className="flex items-center space-x-2">
               <span className="text-2xl font-bold text-primary-600">Nowcast</span>
             </Link>
+            {isAuthenticated && <NotificationBell />}
           </div>
 
           <nav className="mt-6 px-2">
@@ -118,6 +120,18 @@ export default function Layout({ children }: LayoutProps) {
               </Link>
             );
           })}
+          {isAuthenticated && (
+            <Link
+              to="/notifications"
+              className={`p-3 rounded-lg ${
+                location.pathname === '/notifications'
+                  ? 'text-primary-600'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}
+            >
+              <FiBell className="w-6 h-6" />
+            </Link>
+          )}
         </div>
       </nav>
     </div>
