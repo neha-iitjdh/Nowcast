@@ -1,10 +1,18 @@
 import prisma from '../config/database.js';
 import { NotFoundError, ConflictError } from '../utils/errors.js';
+import * as notificationService from './notificationService.js';
+import * as cacheService from './cacheService.js';
+import { invalidateUserFeed } from './feedService.js';
 
 // Like/Unlike
-export async function likePost(userId: string, postId: string) {
+export async function likePost(userId: string, postId: string, username: string) {
   const post = await prisma.post.findUnique({
     where: { id: postId },
+    include: {
+      author: {
+        select: { id: true },
+      },
+    },
   });
 
   if (!post) {
@@ -32,6 +40,12 @@ export async function likePost(userId: string, postId: string) {
       data: { likesCount: { increment: 1 } },
     }),
   ]);
+
+  // Send notification to post author
+  await notificationService.notifyLike(post.authorId, userId, username, postId);
+
+  // Invalidate post cache
+  await cacheService.invalidatePost(postId);
 
   return like;
 }
@@ -64,12 +78,20 @@ export async function unlikePost(userId: string, postId: string) {
       data: { likesCount: { decrement: 1 } },
     }),
   ]);
+
+  // Invalidate post cache
+  await cacheService.invalidatePost(postId);
 }
 
 // Repost
-export async function repost(userId: string, postId: string) {
+export async function repost(userId: string, postId: string, username: string) {
   const post = await prisma.post.findUnique({
     where: { id: postId },
+    include: {
+      author: {
+        select: { id: true },
+      },
+    },
   });
 
   if (!post) {
@@ -95,6 +117,12 @@ export async function repost(userId: string, postId: string) {
       data: { repostsCount: { increment: 1 } },
     }),
   ]);
+
+  // Send notification to post author
+  await notificationService.notifyRepost(post.authorId, userId, username, postId);
+
+  // Invalidate post cache
+  await cacheService.invalidatePost(postId);
 
   return repostRecord;
 }
@@ -127,10 +155,13 @@ export async function unrepost(userId: string, postId: string) {
       data: { repostsCount: { decrement: 1 } },
     }),
   ]);
+
+  // Invalidate post cache
+  await cacheService.invalidatePost(postId);
 }
 
 // Follow/Unfollow
-export async function followUser(followerId: string, followingId: string) {
+export async function followUser(followerId: string, followingId: string, followerUsername: string) {
   if (followerId === followingId) {
     throw new ConflictError('You cannot follow yourself');
   }
@@ -157,6 +188,16 @@ export async function followUser(followerId: string, followingId: string) {
     data: { followerId, followingId },
   });
 
+  // Send notification to followed user
+  await notificationService.notifyFollow(followingId, followerId, followerUsername);
+
+  // Invalidate follower's feed cache (new posts from followed user should appear)
+  await invalidateUserFeed(followerId);
+
+  // Invalidate user cache
+  await cacheService.invalidateUser(followerId);
+  await cacheService.invalidateUser(followingId);
+
   return follow;
 }
 
@@ -174,6 +215,13 @@ export async function unfollowUser(followerId: string, followingId: string) {
   await prisma.follow.delete({
     where: { id: existingFollow.id },
   });
+
+  // Invalidate follower's feed cache
+  await invalidateUserFeed(followerId);
+
+  // Invalidate user cache
+  await cacheService.invalidateUser(followerId);
+  await cacheService.invalidateUser(followingId);
 }
 
 export async function getFollowers(userId: string, page: number = 1, limit: number = 20) {

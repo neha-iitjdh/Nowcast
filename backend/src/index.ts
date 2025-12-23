@@ -2,7 +2,9 @@ import { createServer } from 'http';
 import app from './app.js';
 import { config } from './config/index.js';
 import prisma from './config/database.js';
+import { getRedis, closeRedis } from './config/redis.js';
 import { initializeSocket } from './websocket/socketHandler.js';
+import { initializeNotificationSubscriber } from './services/notificationService.js';
 
 const httpServer = createServer(app);
 
@@ -14,6 +16,18 @@ async function main() {
     // Test database connection
     await prisma.$connect();
     console.log('Connected to PostgreSQL database');
+
+    // Test Redis connection
+    try {
+      const redis = getRedis();
+      await redis.ping();
+      console.log('Connected to Redis');
+
+      // Initialize notification subscriber
+      await initializeNotificationSubscriber();
+    } catch (redisError) {
+      console.warn('Redis not available, running without cache:', redisError);
+    }
 
     // Start server
     httpServer.listen(config.port, () => {
@@ -36,6 +50,13 @@ async function shutdown() {
 
   await prisma.$disconnect();
   console.log('Database connection closed');
+
+  try {
+    await closeRedis();
+    console.log('Redis connection closed');
+  } catch {
+    // Ignore Redis close errors
+  }
 
   process.exit(0);
 }

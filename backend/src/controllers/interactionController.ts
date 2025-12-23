@@ -10,8 +10,9 @@ export async function likePost(
 ) {
   try {
     const userId = req.user!.id;
+    const username = req.user!.username;
     const { postId } = req.params;
-    await interactionService.likePost(userId, postId);
+    await interactionService.likePost(userId, postId, username);
     res.json({
       success: true,
       message: 'Post liked successfully',
@@ -47,8 +48,9 @@ export async function repost(
 ) {
   try {
     const userId = req.user!.id;
+    const username = req.user!.username;
     const { postId } = req.params;
-    await interactionService.repost(userId, postId);
+    await interactionService.repost(userId, postId, username);
     res.json({
       success: true,
       message: 'Reposted successfully',
@@ -84,8 +86,9 @@ export async function followUser(
 ) {
   try {
     const followerId = req.user!.id;
+    const followerUsername = req.user!.username;
     const { userId } = req.params;
-    await interactionService.followUser(followerId, userId);
+    await interactionService.followUser(followerId, userId, followerUsername);
     res.json({
       success: true,
       message: 'Followed successfully',
