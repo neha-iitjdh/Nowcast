@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  bio       String?
+  avatar    String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  posts         Post[]
+  likes         Like[]
+  replies       Reply[]
+  reposts       Repost[]
+  followers     Follow[]  @relation("following")
+  following     Follow[]  @relation("followers")
+  notifications Notification[]
+
+  @@index([username])
+  @@index([email])
+  @@map("users")
+}
+
+model Post {
+  id            String   @id @default(cuid())
+  text          String   @db.VarChar(280)
+  hashtags      String[] @default([])
+  imageUrl      String?  @map("image_url")
+  likesCount    Int      @default(0) @map("likes_count")
+  repliesCount  Int      @default(0) @map("replies_count")
+  repostsCount  Int      @default(0) @map("reposts_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Author relation
+  authorId String @map("author_id")
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  // Thread support - parent post reference
+  parentId String? @map("parent_id")
+  parent   Post?   @relation("ThreadReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Post[]  @relation("ThreadReplies")
+
+  // Interactions
+  likes         Like[]
+  replyRecords  Reply[]
+  reposts       Repost[]
+  notifications Notification[]
+
+  @@index([authorId])
+  @@index([parentId])
+  @@index([createdAt(sort: Desc)])
+  @@index([hashtags])
+  @@map("posts")
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  postId String @map("post_id")
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([postId])
+  @@map("likes")
+}
+
+model Reply {
+  id        String   @id @default(cuid())
+  text      String   @db.VarChar(280)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  postId String @map("post_id")
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
+  @@map("replies")
+}
+
+model Repost {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  postId String @map("post_id")
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([postId])
+  @@map("reposts")
+}
+
+model Follow {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  followerId  String @map("follower_id")
+  follower    User   @relation("followers", fields: [followerId], references: [id], onDelete: Cascade)
+
+  followingId String @map("following_id")
+  following   User   @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      NotificationType
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Optional reference to the post that triggered the notification
+  postId String? @map("post_id")
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // Actor who triggered the notification (e.g., who liked/followed)
+  actorId   String? @map("actor_id")
+  actorName String? @map("actor_name")
+
+  @@index([userId, read])
+  @@index([createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  LIKE
+  REPLY
+  REPOST
+  FOLLOW
+  MENTION
+}
